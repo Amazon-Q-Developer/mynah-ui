@@ -130,6 +130,28 @@ describe('prompt-text-input', () => {
     expect(textInput).toBeDefined();
   });
 
+  it('does not cancel paste events, so the browser performs the undoable insertion', () => {
+    const testTabId = MynahUITabsStore.getInstance().addTab({
+      isSelected: true,
+      store: {}
+    }) as string;
+
+    const textInput = new PromptTextInput({
+      tabId: testTabId,
+      initMaxLength: 1000,
+      onKeydown: () => {}
+    });
+
+    const inputElement = textInput.render.querySelector('.mynah-chat-prompt-input') as HTMLElement;
+    const pasteEvent = new Event('paste', { cancelable: true });
+
+    inputElement.dispatchEvent(pasteEvent);
+
+    // Cancelling the paste would require inserting the text ourselves, and a
+    // script-created text node is not on the browser's native undo stack.
+    expect(pasteEvent.defaultPrevented).toBe(false);
+  });
+
   it('manages text input value and clearing', () => {
     const testTabId = MynahUITabsStore.getInstance().addTab({
       isSelected: true,

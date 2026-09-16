@@ -127,32 +127,9 @@ export class PromptTextInput {
             this.props.onBlur();
           }
         },
-        paste: (e: ClipboardEvent): void => {
-          // Prevent the default paste behavior
-          e.preventDefault();
-
-          // Get plain text from clipboard
-          const text = e.clipboardData?.getData('text/plain');
-          if (text != null) {
-            // Insert text at cursor position
-            const selection = window.getSelection();
-            if ((selection?.rangeCount) != null) {
-              const range = selection.getRangeAt(0);
-              range.deleteContents();
-              range.insertNode(document.createTextNode(text));
-
-              // Move cursor to end of inserted text
-              range.collapse(false);
-              selection.removeAllRanges();
-              selection.addRange(range);
-            }
-
-            // Check if input is empty and trigger input event
-            this.checkIsEmpty();
-            if (this.props.onInput != null) {
-              this.props.onInput(new KeyboardEvent('input'));
-            }
-          }
+        paste: (): void => {
+          // Intentionally a no-op: the input is contenteditable="plaintext-only", so the
+          // browser already inserts plain text and records it on the native undo stack.
         },
       },
     });
