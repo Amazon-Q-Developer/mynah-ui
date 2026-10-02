@@ -1,4 +1,17 @@
 import { Button } from '../button';
+import { configureMarked } from '../../helper/marked';
+
+jest.mock('../overlay', () => ({
+  Overlay: jest.fn().mockImplementation(() => ({
+    close: jest.fn()
+  })),
+  OverlayHorizontalDirection: {
+    START_TO_RIGHT: 'start-to-right'
+  },
+  OverlayVerticalDirection: {
+    TO_TOP: 'to-top'
+  }
+}));
 
 describe('button', () => {
   it('label', () => {
@@ -78,5 +91,81 @@ describe('button', () => {
 
     testButtonElement.dispatchEvent(new Event('mouseenter'));
     expect(mockMouseOverHandler).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders tooltip markdown exactly once', () => {
+    configureMarked();
+    jest.useFakeTimers();
+    const { Overlay } = jest.requireMock('../overlay');
+    (Overlay as jest.Mock).mockClear();
+
+    const testButton = new Button({
+      icon: document.createElement('i'),
+      tooltip: 'Configure **MCP** servers',
+      onClick: jest.fn(),
+    });
+
+    document.body.appendChild(testButton.render);
+    testButton.render.dispatchEvent(new MouseEvent('mouseover'));
+    jest.advanceTimersByTime(350);
+
+    expect(Overlay).toHaveBeenCalledTimes(1);
+    const tooltip = (Overlay as jest.Mock).mock.calls[0][0].children[0] as HTMLElement;
+    expect(tooltip.textContent).toBe('Configure MCP servers');
+    expect(tooltip.querySelector('strong')?.textContent).toBe('MCP');
+    expect(tooltip.textContent).not.toContain('<p>');
+
+    jest.useRealTimers();
+  });
+
+  it('does not render an empty or whitespace-only tooltip', () => {
+    configureMarked();
+    jest.useFakeTimers();
+    const { Overlay } = jest.requireMock('../overlay');
+
+    for (const tooltip of [ '', '   ' ]) {
+      (Overlay as jest.Mock).mockClear();
+      const testButton = new Button({
+        icon: document.createElement('i'),
+        tooltip,
+        onClick: jest.fn(),
+      });
+
+      document.body.appendChild(testButton.render);
+      testButton.render.dispatchEvent(new MouseEvent('mouseover'));
+      jest.advanceTimersByTime(350);
+
+      expect(Overlay).not.toHaveBeenCalled();
+      testButton.render.remove();
+    }
+
+    jest.useRealTimers();
+  });
+
+  it('renders a truncated label tooltip exactly once', () => {
+    configureMarked();
+    jest.useFakeTimers();
+    const { Overlay } = jest.requireMock('../overlay');
+    (Overlay as jest.Mock).mockClear();
+
+    const testButton = new Button({
+      label: 'View **history**',
+      onClick: jest.fn(),
+    });
+    const label = testButton.render.querySelector('.mynah-button-label') as HTMLElement;
+    Object.defineProperties(label, {
+      offsetWidth: { value: 10 },
+      scrollWidth: { value: 20 }
+    });
+
+    document.body.appendChild(testButton.render);
+    testButton.render.dispatchEvent(new MouseEvent('mouseover'));
+    jest.advanceTimersByTime(350);
+
+    const tooltip = (Overlay as jest.Mock).mock.calls[0][0].children[0] as HTMLElement;
+    expect(tooltip.textContent).toBe('View history');
+    expect(tooltip.querySelector('strong')?.textContent).toBe('history');
+
+    jest.useRealTimers();
   });
 });
