@@ -134,17 +134,27 @@ export class PromptTextInput {
           // Get plain text from clipboard
           const text = e.clipboardData?.getData('text/plain');
           if (text != null) {
-            // Insert text at cursor position
-            const selection = window.getSelection();
-            if ((selection?.rangeCount) != null) {
-              const range = selection.getRangeAt(0);
-              range.deleteContents();
-              range.insertNode(document.createTextNode(text));
+            // Use execCommand to insert text - this preserves the browser's native undo stack
+            // so that Ctrl+Z will properly undo the paste operation.
+            // Note: execCommand is deprecated but is still the most reliable way to integrate
+            // with the browser's native undo/redo stack for contenteditable elements.
+            const success = document.execCommand('insertText', false, text);
 
-              // Move cursor to end of inserted text
-              range.collapse(false);
-              selection.removeAllRanges();
-              selection.addRange(range);
+            // Fallback for browsers that don't support execCommand('insertText')
+            if (!success) {
+              const selection = window.getSelection();
+              if ((selection?.rangeCount) != null && selection.rangeCount > 0) {
+                const range = selection.getRangeAt(0);
+                range.deleteContents();
+                const textNode = document.createTextNode(text);
+                range.insertNode(textNode);
+
+                // Move cursor to end of inserted text
+                range.setStartAfter(textNode);
+                range.setEndAfter(textNode);
+                selection.removeAllRanges();
+                selection.addRange(range);
+              }
             }
 
             // Check if input is empty and trigger input event
