@@ -93,18 +93,19 @@ export class DetailedListWrapper {
    *
    */
   private readonly handleScroll = (): void => {
-    const wrapperOffsetHeight = this.detailedListItemGroupsContainer.offsetHeight;
-    if (wrapperOffsetHeight === 0) return; // Not laid out yet — skip
-    const wrapperScrollTop = this.detailedListItemGroupsContainer.scrollTop;
-    const buffer = wrapperOffsetHeight;
+    const wrapperRect = this.detailedListItemGroupsContainer.getBoundingClientRect();
+    if (wrapperRect.height === 0) return; // Not laid out yet — skip
+    const buffer = wrapperRect.height;
 
     this.detailedListItemsBlockData.forEach(itemsBlock => {
-      const itemBlockTop = itemsBlock.element.offsetTop;
-      const itemBlockBottom = itemBlockTop + itemsBlock.element.offsetHeight;
+      // offsetTop is relative to an offset parent (e.g. the sheet), not the
+      // scrolling list. Compare both rectangles in viewport coordinates so a
+      // short list below a sheet header is not mistaken for offscreen content.
+      const itemBlockRect = itemsBlock.element.getBoundingClientRect();
       const hasChildren = itemsBlock.element.childNodes.length > 0;
 
-      const isVisible = (itemBlockTop < wrapperScrollTop + wrapperOffsetHeight + buffer) &&
-        (itemBlockBottom > wrapperScrollTop - buffer);
+      const isVisible = (itemBlockRect.top < wrapperRect.bottom + buffer) &&
+        (itemBlockRect.bottom > wrapperRect.top - buffer);
 
       if (!hasChildren && isVisible) {
         // Block is visible but not rendered yet - add DOM elements

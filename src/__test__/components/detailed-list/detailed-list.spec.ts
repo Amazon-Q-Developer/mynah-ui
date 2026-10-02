@@ -453,55 +453,101 @@ describe('DetailedListWrapper Component', () => {
       expect(renderedBlocks).toBeGreaterThan(0);
     });
 
-    it('should handle virtualization with blocks entering viewport', () => {
-      detailedListWrapper = new DetailedListWrapper({ detailedList: largeDetailedList });
+    const mockRect = (element: HTMLElement, top: number, height: number): void => {
+      jest.spyOn(element, 'getBoundingClientRect').mockReturnValue({
+        top,
+        bottom: top + height,
+        height,
+        left: 0,
+        right: 400,
+        width: 400,
+        x: 0,
+        y: top,
+        toJSON: () => ({})
+      });
+    };
+
+    it.each([ 'Active', 'Disabled' ])('keeps a single %s item below a sheet header', (groupName) => {
+      detailedListWrapper = new DetailedListWrapper({
+        detailedList: { list: [ { groupName, children: [ { id: 'server', title: 'Server' } ] } ] }
+      });
       document.body.appendChild(detailedListWrapper.render);
+      const container = detailedListWrapper.render.querySelector('.mynah-detailed-list-item-groups-wrapper') as HTMLElement;
+      const block = detailedListWrapper.render.querySelector('.mynah-detailed-list-items-block') as HTMLElement;
+      // The positioned sheet is the offset parent, not the scrolling container.
+      Object.defineProperty(container, 'offsetHeight', { value: 60 });
+      Object.defineProperty(block, 'offsetTop', { value: 220 });
+      Object.defineProperty(block, 'offsetHeight', { value: 36 });
+      mockRect(container, 200, 60);
+      mockRect(block, 220, 36);
 
-      const groupsContainer = document.body.querySelector('.mynah-detailed-list-item-groups-wrapper') as HTMLElement;
-      const itemsBlocks = document.body.querySelectorAll('.mynah-detailed-list-items-block');
+      container.dispatchEvent(new Event('scroll'));
 
-      // Mock properties for a block that should be rendered
-      Object.defineProperty(groupsContainer, 'offsetHeight', { value: 400 });
-      Object.defineProperty(groupsContainer, 'scrollTop', { value: 0 });
-
-      // Mock a block that's in viewport but not rendered
-      const testBlock = itemsBlocks[6] as HTMLElement; // Beyond first 5
-      if (testBlock != null) {
-        Object.defineProperty(testBlock, 'offsetTop', { value: 100 });
-        Object.defineProperty(testBlock, 'offsetHeight', { value: 200 });
-
-        // Clear the block first
-        testBlock.innerHTML = '';
-
-        // Trigger scroll to render it
-        groupsContainer.dispatchEvent(new Event('scroll'));
-
-        expect(detailedListWrapper.render).toBeDefined();
-      }
+      expect(block.querySelectorAll('.mynah-detailed-list-item')).toHaveLength(1);
+      expect(block.textContent).toContain('Server');
     });
 
-    it('should handle virtualization with blocks leaving viewport', () => {
+    it('keeps the remaining row when the list shrinks from two servers to one', () => {
+      detailedListWrapper = new DetailedListWrapper({ detailedList: basicDetailedList });
+      document.body.appendChild(detailedListWrapper.render);
+      const container = detailedListWrapper.render.querySelector('.mynah-detailed-list-item-groups-wrapper') as HTMLElement;
+      expect(container.querySelectorAll('.mynah-detailed-list-item')).toHaveLength(2);
+
+      detailedListWrapper.update({ list: [ { groupName: 'Active', children: [ { id: 'item-2', title: 'Test Item 2' } ] } ] });
+      const block = container.querySelector('.mynah-detailed-list-items-block') as HTMLElement;
+      Object.defineProperty(container, 'offsetHeight', { value: 60 });
+      Object.defineProperty(block, 'offsetTop', { value: 220 });
+      Object.defineProperty(block, 'offsetHeight', { value: 36 });
+      mockRect(container, 200, 60);
+      mockRect(block, 220, 36);
+      container.dispatchEvent(new Event('scroll'));
+
+      expect(container.querySelectorAll('.mynah-detailed-list-item')).toHaveLength(1);
+      expect(block.textContent).toContain('Test Item 2');
+      expect(block.textContent).not.toContain('Test Item 1');
+    });
+
+    it('renders a virtualized block when it enters the viewport buffer', () => {
       detailedListWrapper = new DetailedListWrapper({ detailedList: largeDetailedList });
       document.body.appendChild(detailedListWrapper.render);
+      const container = detailedListWrapper.render.querySelector('.mynah-detailed-list-item-groups-wrapper') as HTMLElement;
+      const blocks = container.querySelectorAll('.mynah-detailed-list-items-block');
+      const block = blocks[1] as HTMLElement;
+      expect(block.children).toHaveLength(0);
+      mockRect(container, 200, 400);
+      mockRect(block, 600, 1800);
 
-      const groupsContainer = document.body.querySelector('.mynah-detailed-list-item-groups-wrapper') as HTMLElement;
-      const itemsBlocks = document.body.querySelectorAll('.mynah-detailed-list-items-block');
+      container.dispatchEvent(new Event('scroll'));
 
-      // Mock properties for a block that should be cleared
-      Object.defineProperty(groupsContainer, 'offsetHeight', { value: 400 });
-      Object.defineProperty(groupsContainer, 'scrollTop', { value: 2000 }); // Scrolled far down
+      expect(block.querySelectorAll('.mynah-detailed-list-item')).toHaveLength(50);
+    });
 
-      // Mock a block that's out of viewport
-      const testBlock = itemsBlocks[0] as HTMLElement;
-      if (testBlock != null) {
-        Object.defineProperty(testBlock, 'offsetTop', { value: 0 });
-        Object.defineProperty(testBlock, 'offsetHeight', { value: 200 });
+    it('clears offscreen blocks and renders them again on return', () => {
+      detailedListWrapper = new DetailedListWrapper({ detailedList: largeDetailedList });
+      document.body.appendChild(detailedListWrapper.render);
+      const container = detailedListWrapper.render.querySelector('.mynah-detailed-list-item-groups-wrapper') as HTMLElement;
+      const block = container.querySelector('.mynah-detailed-list-items-block') as HTMLElement;
+      mockRect(container, 200, 400);
+      mockRect(block, -2000, 1800);
+      expect(block.children).toHaveLength(50);
 
-        // Trigger scroll to clear it
-        groupsContainer.dispatchEvent(new Event('scroll'));
+      container.dispatchEvent(new Event('scroll'));
+      expect(block.children).toHaveLength(0);
 
-        expect(detailedListWrapper.render).toBeDefined();
-      }
+      mockRect(block, 200, 1800);
+      container.dispatchEvent(new Event('scroll'));
+      expect(block.children).toHaveLength(50);
+    });
+
+    it('does not clear rows before the container is laid out', () => {
+      detailedListWrapper = new DetailedListWrapper({ detailedList: basicDetailedList });
+      document.body.appendChild(detailedListWrapper.render);
+      const container = detailedListWrapper.render.querySelector('.mynah-detailed-list-item-groups-wrapper') as HTMLElement;
+      mockRect(container, 200, 0);
+
+      container.dispatchEvent(new Event('scroll'));
+
+      expect(container.querySelectorAll('.mynah-detailed-list-item')).toHaveLength(2);
     });
   });
 
