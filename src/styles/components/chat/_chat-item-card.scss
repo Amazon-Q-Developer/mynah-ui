@@ -457,8 +457,27 @@
                 display: none;
                 flex-flow: column nowrap;
             }
-            &.show-summary > .mynah-chat-item-card-summary-collapsed-content {
-                display: flex;
+            // When expanded, the header and the collapsed content should read as a
+            // single container instead of separate rounded boxes. Square the header's
+            // bottom corners and the content's top corners so they connect, and let the
+            // header's bottom border act as the divider between the header and the
+            // parameters/results below.
+            &.show-summary {
+                > .mynah-chat-item-card-summary-content {
+                    border-bottom-left-radius: 0;
+                    border-bottom-right-radius: 0;
+                }
+                > .mynah-chat-item-card-summary-collapsed-content {
+                    display: flex;
+                    border-right: var(--mynah-border-width) solid var(--mynah-color-border-default);
+                    border-bottom: var(--mynah-border-width) solid var(--mynah-color-border-default);
+                    border-left: var(--mynah-border-width) solid var(--mynah-color-border-default);
+                    border-bottom-left-radius: var(--mynah-card-radius);
+                    border-bottom-right-radius: var(--mynah-card-radius);
+                    // Clip the inner parameter/result cards to the container's shape so
+                    // their own corners do not create separate rounded boxes.
+                    overflow: hidden;
+                }
             }
         }
     }
