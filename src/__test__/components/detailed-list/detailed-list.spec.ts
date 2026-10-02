@@ -488,7 +488,8 @@ describe('DetailedListWrapper Component', () => {
     });
 
     it('keeps the remaining row when the list shrinks from two servers to one', () => {
-      detailedListWrapper = new DetailedListWrapper({ detailedList: basicDetailedList });
+      // update() mutates the supplied list; do not change other tests' fixture.
+      detailedListWrapper = new DetailedListWrapper({ detailedList: structuredClone(basicDetailedList) });
       document.body.appendChild(detailedListWrapper.render);
       const container = detailedListWrapper.render.querySelector('.mynah-detailed-list-item-groups-wrapper') as HTMLElement;
       expect(container.querySelectorAll('.mynah-detailed-list-item')).toHaveLength(2);
@@ -505,6 +506,7 @@ describe('DetailedListWrapper Component', () => {
       expect(container.querySelectorAll('.mynah-detailed-list-item')).toHaveLength(1);
       expect(block.textContent).toContain('Test Item 2');
       expect(block.textContent).not.toContain('Test Item 1');
+      expect(basicDetailedList.list?.[0].children?.map(item => item.id)).toEqual([ 'item-1', 'item-2' ]);
     });
 
     it('renders a virtualized block when it enters the viewport buffer', () => {
