@@ -112,7 +112,44 @@ describe('prompt-text-input', () => {
     expect(inputElement?.getAttribute('placeholder')).toBe('Updated placeholder');
   });
 
-  it('handles paste events', () => {
+  it('inserts pasted text via execCommand so it can be undone', () => {
+    const testTabId = MynahUITabsStore.getInstance().addTab({
+      isSelected: true,
+      store: {}
+    }) as string;
+
+    let inputCalled = false;
+    const textInput = new PromptTextInput({
+      tabId: testTabId,
+      initMaxLength: 1000,
+      onKeydown: () => {},
+      onInput: () => { inputCalled = true; }
+    });
+
+    const inputElement = textInput.render.querySelector('.mynah-chat-prompt-input') as HTMLElement;
+
+    const originalExecCommand = document.execCommand;
+    const execCommandMock = jest.fn(() => true);
+    document.execCommand = execCommandMock as unknown as typeof document.execCommand;
+
+    const pasteEvent = new Event('paste', { bubbles: true, cancelable: true });
+    Object.defineProperty(pasteEvent, 'clipboardData', {
+      value: { getData: (type: string) => (type === 'text/plain' ? 'pasted text' : '') }
+    });
+    const preventDefaultSpy = jest.spyOn(pasteEvent, 'preventDefault');
+
+    inputElement.dispatchEvent(pasteEvent);
+
+    // The default paste is prevented and the text is inserted through
+    // execCommand('insertText'), which keeps it in the browser undo history.
+    expect(preventDefaultSpy).toHaveBeenCalled();
+    expect(execCommandMock).toHaveBeenCalledWith('insertText', false, 'pasted text');
+    expect(inputCalled).toBe(true);
+
+    document.execCommand = originalExecCommand;
+  });
+
+  it('falls back to manual insertion when execCommand is unavailable', () => {
     const testTabId = MynahUITabsStore.getInstance().addTab({
       isSelected: true,
       store: {}
@@ -125,9 +162,49 @@ describe('prompt-text-input', () => {
     });
 
     const inputElement = textInput.render.querySelector('.mynah-chat-prompt-input') as HTMLElement;
+    document.body.appendChild(textInput.render);
 
+    // Place a collapsed selection inside the input.
+    const range = document.createRange();
+    range.selectNodeContents(inputElement);
+    range.collapse(false);
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+
+    const originalExecCommand = document.execCommand;
+    document.execCommand = jest.fn(() => false) as unknown as typeof document.execCommand;
+
+    const pasteEvent = new Event('paste', { bubbles: true, cancelable: true });
+    Object.defineProperty(pasteEvent, 'clipboardData', {
+      value: { getData: (type: string) => (type === 'text/plain' ? 'fallback text' : '') }
+    });
+
+    inputElement.dispatchEvent(pasteEvent);
+
+    expect(inputElement.textContent).toContain('fallback text');
+
+    document.execCommand = originalExecCommand;
+    document.body.removeChild(textInput.render);
+  });
+
+  it('ignores paste events without text content', () => {
+    const testTabId = MynahUITabsStore.getInstance().addTab({
+      isSelected: true,
+      store: {}
+    }) as string;
+
+    let inputCalled = false;
+    const textInput = new PromptTextInput({
+      tabId: testTabId,
+      initMaxLength: 1000,
+      onKeydown: () => {},
+      onInput: () => { inputCalled = true; }
+    });
+
+    const inputElement = textInput.render.querySelector('.mynah-chat-prompt-input') as HTMLElement;
     inputElement.dispatchEvent(new Event('paste'));
-    expect(textInput).toBeDefined();
+    expect(inputCalled).toBe(false);
   });
 
   it('manages text input value and clearing', () => {

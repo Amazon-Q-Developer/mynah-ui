@@ -133,18 +133,31 @@ export class PromptTextInput {
 
           // Get plain text from clipboard
           const text = e.clipboardData?.getData('text/plain');
-          if (text != null) {
-            // Insert text at cursor position
-            const selection = window.getSelection();
-            if ((selection?.rangeCount) != null) {
-              const range = selection.getRangeAt(0);
-              range.deleteContents();
-              range.insertNode(document.createTextNode(text));
+          if (text != null && text !== '') {
+            // Insert via execCommand so the paste is recorded in the browser's
+            // native undo history. Manually inserting a text node (the fallback
+            // below) bypasses the undo stack, which breaks Ctrl/Cmd+Z after a paste.
+            let inserted = false;
+            try {
+              inserted = document.execCommand('insertText', false, text);
+            } catch {
+              inserted = false;
+            }
 
-              // Move cursor to end of inserted text
-              range.collapse(false);
-              selection.removeAllRanges();
-              selection.addRange(range);
+            if (!inserted) {
+              // Fallback for environments where execCommand is unavailable:
+              // insert text at the cursor position manually.
+              const selection = window.getSelection();
+              if ((selection?.rangeCount) != null) {
+                const range = selection.getRangeAt(0);
+                range.deleteContents();
+                range.insertNode(document.createTextNode(text));
+
+                // Move cursor to end of inserted text
+                range.collapse(false);
+                selection.removeAllRanges();
+                selection.addRange(range);
+              }
             }
 
             // Check if input is empty and trigger input event
