@@ -30,7 +30,7 @@ jobs:
           # Build Docker image with caching (for non-fork PRs)
           - name: Build E2E tests Docker Image (with cache)
             if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
-            uses: docker/build-push-action@v5
+            uses: docker/build-push-action@v6
             with:
               context: .
               push: false
@@ -42,7 +42,7 @@ jobs:
           # Build Docker image without caching (for fork PRs)
           - name: Build E2E tests Docker Image (no cache)
             if: ${{ github.event.pull_request.head.repo.full_name != github.repository }}
-            uses: docker/build-push-action@v5
+            uses: docker/build-push-action@v6
             with:
               context: .
               push: false
