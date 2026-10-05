@@ -96,4 +96,23 @@ describe('mynah-ui', () => {
       expect(true).toBe(false);
     }
   });
+
+  it('sets initial selected-tab attribute on tab contents wrapper', () => {
+    new MynahUI({
+      config: {
+        maxTabs: 1,
+      },
+      tabs: {
+        [testTabId]: {
+          isSelected: true,
+          store: {
+            loadingChat: false,
+          }
+        }
+      }
+    });
+
+    const tabContentsWrapper = document.body.querySelector('.mynah-ui-tab-contents-wrapper');
+    expect(tabContentsWrapper?.getAttribute('selected-tab')).toBe(testTabId);
+  });
 });

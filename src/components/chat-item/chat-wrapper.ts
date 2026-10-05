@@ -288,13 +288,13 @@ export class ChatWrapper {
         {
           type: 'style',
           children: [ `
-          .mynah-nav-tabs-wrapper[selected-tab="${this.props.tabId}"] ~ .mynah-ui-tab-contents-wrapper > .mynah-chat-wrapper[mynah-tab-id="${this.props.tabId}"]{
+          .mynah-ui-tab-contents-wrapper[selected-tab="${this.props.tabId}"] > .mynah-chat-wrapper[mynah-tab-id="${this.props.tabId}"]{
               visibility: visible;
               position: relative;
               left: initial;
               opacity: 1;
             }
-            .mynah-nav-tabs-wrapper[selected-tab="${this.props.tabId}"] ~ .mynah-ui-tab-contents-wrapper > .mynah-chat-wrapper:not([mynah-tab-id="${this.props.tabId}"]) * {
+            .mynah-ui-tab-contents-wrapper[selected-tab="${this.props.tabId}"] > .mynah-chat-wrapper:not([mynah-tab-id="${this.props.tabId}"]) * {
               pointer-events: none !important;
             }
           ` ],
