@@ -26,8 +26,76 @@
         }
     }
     .mynah-ui-form-item-description {
+        position: relative;
         font-size: var(--mynah-font-size-small);
         color: var(--mynah-color-text-weak);
+
+        .mynah-ui-form-item-description-content {
+            display: block;
+            line-height: 1.4;
+        }
+
+        &.mynah-ui-form-item-description-auto-collapse {
+            .mynah-ui-form-item-description-content {
+                position: relative;
+                
+                // Default state - no fade effect
+                &::after {
+                    content: '';
+                    position: absolute;
+                    bottom: 0;
+                    left: 0;
+                    right: 0;
+                    height: 1rem;
+                    background: linear-gradient(transparent, var(--mynah-color-bg));
+                    pointer-events: none;
+                    opacity: 0;
+                    transition: opacity 0.15s ease-in-out;
+                }
+            }
+
+            // Only show fade effect when collapsed
+            &.mynah-ui-form-item-description-collapsed {
+                .mynah-ui-form-item-description-content {
+                    max-height: var(--form-description-collapsed-height, 3.125vh); // window.innerHeight / 32
+                    overflow: hidden;
+                    transition: max-height 0.3s ease-in-out;
+                    
+                    &::after {
+                        opacity: 1;
+                    }
+                }
+            }
+
+            // When expanded, ensure no fade and smooth transition
+            &:not(.mynah-ui-form-item-description-collapsed) {
+                .mynah-ui-form-item-description-content {
+                    max-height: none;
+                    overflow: visible;
+                    transition: max-height 0.3s ease-in-out;
+                    
+                    &::after {
+                        opacity: 0;
+                    }
+                }
+            }
+        }
+
+        .more-content-indicator {
+            margin-top: var(--mynah-sizing-1);
+            
+            &.hidden {
+                display: none;
+            }
+        }
+
+        // Only remove shadow when expanded (not collapsed)
+        &:not(.mynah-ui-form-item-description-collapsed) {
+            .more-content-indicator {
+                box-shadow: none;
+                background-color: transparent;
+            }
+        }
     }
     .mynah-form-input-container {
         position: relative;
