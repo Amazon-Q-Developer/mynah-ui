@@ -126,6 +126,7 @@
         padding: var(--mynah-sizing-2);
         position: relative;
         margin: 0;
+        min-width: 0;
         overflow-x: auto;
         overflow-y: scroll;
         box-sizing: border-box;
