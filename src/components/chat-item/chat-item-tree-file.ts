@@ -3,11 +3,9 @@ import { MynahUIGlobalEvents, cancelEvent } from '../../helper/events';
 import { FileNodeAction, MynahEventNames, TreeNodeDetails } from '../../static';
 import { Button } from '../button';
 import { Card } from '../card/card';
-import { CardBody } from '../card/card-body';
 import { Icon, MynahIcons, MynahIconsType } from '../icon';
 import { Overlay, OverlayHorizontalDirection, OverlayVerticalDirection } from '../overlay';
 import testIds from '../../helper/test-ids';
-import { parseMarkdown } from '../../helper/marked';
 
 export interface ChatItemTreeFileProps {
   tabId: string;
@@ -54,20 +52,19 @@ export class ChatItemTreeFile {
         mouseover: (e) => {
           cancelEvent(e);
           const textContentSpan: HTMLSpanElement | null = this.render.querySelector('.mynah-chat-item-tree-view-file-item-title-text');
-          let tooltipText;
+          // The file name and path are literal text (e.g. Windows paths such as
+          // C:\Users\me\.gradle\init.gradle). They must not be rendered as markdown,
+          // otherwise sequences like "\." are treated as escape characters and the
+          // backslash is dropped from the displayed path.
+          const tooltipLines: string[] = [];
           if (textContentSpan != null && textContentSpan.offsetWidth < textContentSpan.scrollWidth) {
-            tooltipText = parseMarkdown(this.props.fileName, { includeLineBreaks: true });
+            tooltipLines.push(this.props.fileName);
           }
-          if (this.props.details?.description != null) {
-            if (tooltipText != null) {
-              tooltipText += '\n\n';
-            } else {
-              tooltipText = '';
-            }
-            tooltipText += parseMarkdown(this.props.details?.description ?? '', { includeLineBreaks: true });
+          if (this.props.details?.description != null && this.props.details.description !== '') {
+            tooltipLines.push(this.props.details.description);
           }
-          if (tooltipText != null) {
-            this.showTooltip(tooltipText, undefined, OverlayHorizontalDirection.START_TO_RIGHT, textContentSpan);
+          if (tooltipLines.length > 0) {
+            this.showTooltip(tooltipLines, undefined, OverlayHorizontalDirection.START_TO_RIGHT, textContentSpan);
           }
         },
         mouseleave: this.hideTooltip
@@ -153,8 +150,9 @@ export class ChatItemTreeFile {
     });
   }
 
-  private readonly showTooltip = (content: string, vDir?: OverlayVerticalDirection, hDir?: OverlayHorizontalDirection, elm?: null | HTMLElement | ExtendedHTMLElement): void => {
-    if (content.trim() !== '') {
+  private readonly showTooltip = (lines: string[], vDir?: OverlayVerticalDirection, hDir?: OverlayHorizontalDirection, elm?: null | HTMLElement | ExtendedHTMLElement): void => {
+    const nonEmptyLines = lines.filter((line) => line.trim() !== '');
+    if (nonEmptyLines.length > 0) {
       clearTimeout(this.fileTooltipTimeout);
       this.fileTooltipTimeout = setTimeout(() => {
         clearTimeout(this.fileTooltipTimeout);
@@ -170,11 +168,15 @@ export class ChatItemTreeFile {
           children: [
             new Card({
               border: false,
-              children: [
-                new CardBody({
-                  body: content
-                }).render
-              ]
+              // Render each line as literal text (not markdown) so file paths are
+              // shown verbatim, including backslashes in Windows paths.
+              children: nonEmptyLines.map((line) =>
+                DomBuilder.getInstance().build({
+                  type: 'div',
+                  classNames: [ 'mynah-chat-item-tree-view-file-tooltip-line' ],
+                  children: [ line ],
+                })
+              ),
             }).render
           ],
         });
