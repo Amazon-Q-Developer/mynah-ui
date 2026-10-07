@@ -26,7 +26,6 @@ import { ChatItemTabbedCard } from './chat-item-tabbed-card';
 import { MoreContentIndicator } from '../more-content-indicator';
 import { Button } from '../button';
 import { Overlay, OverlayHorizontalDirection, OverlayVerticalDirection } from '../overlay';
-import { marked } from 'marked';
 import { parseMarkdown } from '../../helper/marked';
 import { DropdownWrapper } from '../dropdown-form/dropdown-wrapper';
 
@@ -502,8 +501,7 @@ export class ChatItemCard {
                 events: {
                   mouseover: (e) => {
                     cancelEvent(e);
-                    const tooltipText = marked(this.props.chatItem?.header?.status?.description ?? '', { breaks: true }) as string;
-                    this.showTooltip(tooltipText, e.target ?? e.currentTarget);
+                    this.showTooltip(this.props.chatItem?.header?.status?.description ?? '', e.currentTarget);
                   },
                   mouseleave: this.hideTooltip
                 }
@@ -949,7 +947,7 @@ export class ChatItemCard {
   };
 
   private readonly showTooltip = (content: string, elm: HTMLElement): void => {
-    if (content.trim() !== undefined) {
+    if (content.trim() !== '') {
       clearTimeout(this.tooltipTimeout);
       this.tooltipTimeout = setTimeout(() => {
         this.tooltipOverlay = new Overlay({
