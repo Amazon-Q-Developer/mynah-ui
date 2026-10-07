@@ -1,6 +1,14 @@
 import { ChatItemCard } from '../../chat-item/chat-item-card';
 import { ChatItemType } from '../../../static';
 import { MynahUIGlobalEvents } from '../../../helper/events';
+import { configureMarked } from '../../../helper/marked';
+import { Overlay } from '../../overlay';
+
+jest.mock('../../overlay', () => ({
+  Overlay: jest.fn().mockImplementation(() => ({ close: jest.fn() })),
+  OverlayHorizontalDirection: { CENTER: 'center' },
+  OverlayVerticalDirection: { TO_TOP: 'to-top' }
+}));
 
 // Mock the tabs store
 jest.mock('../../../helper/tabs-store', () => ({
@@ -16,6 +24,7 @@ jest.mock('../../../helper/tabs-store', () => ({
 
 // Mock global events
 jest.mock('../../../helper/events', () => ({
+  ...jest.requireActual('../../../helper/events'),
   MynahUIGlobalEvents: {
     getInstance: jest.fn(() => ({
       dispatch: jest.fn()
@@ -47,6 +56,76 @@ describe('ChatItemCard', () => {
     });
 
     expect(card.render).toBeDefined();
+  });
+
+  describe('status error tooltip', () => {
+    beforeAll(() => {
+      configureMarked();
+    });
+
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
+
+    afterEach(() => {
+      jest.clearAllTimers();
+      jest.useRealTimers();
+    });
+
+    const createBadge = (description?: string): HTMLElement => {
+      const card = new ChatItemCard({
+        tabId: 'test-tab',
+        chatItem: {
+          type: ChatItemType.ANSWER,
+          header: { body: 'example.txt', status: { status: 'error', text: 'Error', description } }
+        }
+      });
+      return card.render.querySelector('.mynah-chat-item-card-header-status') as HTMLElement;
+    };
+
+    it('renders the description markdown once and anchors to the whole badge', () => {
+      const badge = createBadge('File already exists with **identical content**.');
+      const label = badge.querySelector('span') as HTMLElement;
+      label.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+      jest.advanceTimersByTime(350);
+
+      expect(Overlay).toHaveBeenCalledTimes(1);
+      const options = (Overlay as jest.Mock).mock.calls[0][0];
+      const tooltip = options.children[0] as HTMLElement;
+      expect(options.referenceElement).toBe(badge);
+      expect(tooltip.textContent).toBe('File already exists with identical content.');
+      expect(tooltip.querySelector('strong')?.textContent).toBe('identical content');
+      expect(tooltip.textContent).not.toContain('<p>');
+      expect(badge.hasAttribute('title')).toBe(false);
+      expect(badge.textContent).toBe('Error');
+    });
+
+    it('renders a plain-text error description', () => {
+      const badge = createBadge('Unable to open example.txt.');
+      badge.dispatchEvent(new MouseEvent('mouseover'));
+      jest.advanceTimersByTime(350);
+
+      expect(Overlay).toHaveBeenCalledTimes(1);
+      const tooltip = (Overlay as jest.Mock).mock.calls[0][0].children[0] as HTMLElement;
+      expect(tooltip.textContent).toBe('Unable to open example.txt.');
+    });
+
+    it.each([ undefined, '', '   ', '\n\t' ])('does not create a tooltip for description %p', (description) => {
+      const badge = createBadge(description);
+      badge.dispatchEvent(new MouseEvent('mouseover'));
+      jest.advanceTimersByTime(350);
+
+      expect(Overlay).not.toHaveBeenCalled();
+    });
+
+    it('cancels the pending tooltip when the pointer leaves', () => {
+      const badge = createBadge('Unable to open example.txt.');
+      badge.dispatchEvent(new MouseEvent('mouseover'));
+      badge.dispatchEvent(new MouseEvent('mouseleave'));
+      jest.advanceTimersByTime(350);
+
+      expect(Overlay).not.toHaveBeenCalled();
+    });
   });
 
   describe('Pills functionality', () => {
