@@ -22,6 +22,9 @@
             > .mynah-syntax-highlighter {
                 pointer-events: auto;
                 user-select: text;
+                // Allow scrolling on hover so the full (overflowing) code snippet can be
+                // viewed; without this the content is clipped and no scrollbar is usable.
+                overflow: auto;
                 pre {
                     text-overflow: unset;
                 }
@@ -63,6 +66,10 @@
     > .mynah-card-body {
         > .mynah-syntax-highlighter {
             max-height: calc(70vh - var(--mynah-sizing-12)) !important;
+            // The preview is meant to show the full snippet, so allow it to scroll
+            // (horizontally and vertically) and be interactive.
+            overflow: auto !important;
+            pointer-events: auto !important;
         }
     }
 }
