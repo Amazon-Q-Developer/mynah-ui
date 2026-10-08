@@ -27,6 +27,11 @@ jobs:
               username: ${{ github.actor }}
               password: ${{ secrets.GITHUB_TOKEN }}
 
+          # Image references must be lowercase, but github.repository may contain uppercase characters
+          - name: Compute cache image ref
+            if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+            run: echo "CACHE_REF=ghcr.io/${GITHUB_REPOSITORY,,}/mynah-ui-e2e:buildcache" >> "$GITHUB_ENV"
+
           # Build Docker image with caching (for non-fork PRs)
           - name: Build E2E tests Docker Image (with cache)
             if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
@@ -36,8 +41,8 @@ jobs:
               push: false
               load: true
               tags: mynah-ui-e2e:latest
-              cache-from: type=registry,ref=ghcr.io/${{ github.repository }}/mynah-ui-e2e:buildcache
-              cache-to: type=registry,ref=ghcr.io/${{ github.repository }}/mynah-ui-e2e:buildcache,mode=max
+              cache-from: type=registry,ref=${{ env.CACHE_REF }}
+              cache-to: type=registry,ref=${{ env.CACHE_REF }},mode=max
 
           # Build Docker image without caching (for fork PRs)
           - name: Build E2E tests Docker Image (no cache)
