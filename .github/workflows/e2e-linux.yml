@@ -36,8 +36,8 @@ jobs:
               push: false
               load: true
               tags: mynah-ui-e2e:latest
-              cache-from: type=registry,ref=ghcr.io/${{ github.repository }}/mynah-ui-e2e:buildcache
-              cache-to: type=registry,ref=ghcr.io/${{ github.repository }}/mynah-ui-e2e:buildcache,mode=max
+              cache-from: type=registry,ref=ghcr.io/amazon-q-developer/mynah-ui/mynah-ui-e2e:buildcache
+              cache-to: type=registry,ref=ghcr.io/amazon-q-developer/mynah-ui/mynah-ui-e2e:buildcache,mode=max
 
           # Build Docker image without caching (for fork PRs)
           - name: Build E2E tests Docker Image (no cache)
