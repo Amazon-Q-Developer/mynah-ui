@@ -10,3 +10,9 @@ jobs:
     uses: ./.github/workflows/unit-tests.yml
   e2e-linux:
     uses: ./.github/workflows/e2e-linux.yml
+    # e2e-linux.yml requests contents: read and packages: write. A called workflow cannot
+    # exceed the caller's token permissions, so if either is missing the run fails at startup.
+    # Granted to this job only, because lint and unit-tests do not need packages: write.
+    permissions:
+      contents: read
+      packages: write
