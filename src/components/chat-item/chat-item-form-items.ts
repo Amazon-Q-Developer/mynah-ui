@@ -291,6 +291,12 @@ export class ChatItemFormItemsWrapper {
                     this.showTooltip(tooltipToShow, chatOption.render);
                   }
                 },
+                // Dismiss the tooltip as soon as the control is activated. Toggling an
+                // option (e.g. a switch) can re-render the prompt input and remove this
+                // element before 'mouseleave' fires, which would otherwise leave the
+                // tooltip overlay orphaned on top of the chat and block interaction.
+                mousedown: this.hideTooltip,
+                click: this.hideTooltip,
                 mouseleave: this.hideTooltip
               }
             });

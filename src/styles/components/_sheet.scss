@@ -89,7 +89,9 @@
         border-radius: 0;
         height: 100%;
         overflow-x: hidden;
-        overflow-y: scroll;
+        // Only show the scrollbar when content overflows, avoiding a permanent
+        // (often empty) scrollbar in the fullscreen sheet.
+        overflow-y: auto;
     }
 
     > .mynah-card-body {
@@ -126,7 +128,11 @@
         gap: var(--mynah-sizing-4);
         align-items: stretch;
         flex: 1;
-        overflow-y: scroll;
+        // Use auto so the scrollbar only appears when the content actually
+        // overflows. With 'scroll' the sheet body always renders a scrollbar,
+        // which combined with the inner scrollable list (e.g. the MCP view)
+        // produced a redundant second scrollbar wrapping the whole panel.
+        overflow-y: auto;
         overflow-x: hidden;
         > .mynah-sheet-header-status {
             box-shadow: none;

@@ -174,7 +174,7 @@ class ButtonInternal extends ButtonAbstract {
           const textContentSpan: HTMLSpanElement | null = this.render.querySelector('.mynah-button-label');
           let tooltipText;
           if (props.label != null && typeof props.label === 'string' && textContentSpan != null && textContentSpan.offsetWidth < textContentSpan.scrollWidth) {
-            tooltipText = parseMarkdown(props.label ?? '', { includeLineBreaks: true });
+            tooltipText = props.label;
           }
           if (props.tooltip !== undefined) {
             if (tooltipText != null) {
@@ -182,9 +182,10 @@ class ButtonInternal extends ButtonAbstract {
             } else {
               tooltipText = '';
             }
-            tooltipText += parseMarkdown(props.tooltip ?? '', { includeLineBreaks: true });
+            // CardBody owns markdown rendering; pre-rendering here causes its parser to escape the generated HTML.
+            tooltipText += props.tooltip;
           }
-          if (tooltipText != null) {
+          if (tooltipText != null && tooltipText.trim() !== '') {
             this.showTooltip(tooltipText);
           }
         },
@@ -210,7 +211,7 @@ class ButtonInternal extends ButtonAbstract {
   };
 
   private readonly showTooltip = (content: string): void => {
-    if (content.trim() !== undefined) {
+    if (content.trim() !== '') {
       clearTimeout(this.tooltipTimeout);
       this.tooltipTimeout = setTimeout(() => {
         const elm: HTMLElement = this.render;

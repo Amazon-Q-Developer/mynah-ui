@@ -1,6 +1,20 @@
 import { ChatItemFormItemsWrapper } from '../../chat-item/chat-item-form-items';
 import { ChatItem, ChatItemType } from '../../../static';
 
+// Mock the overlay so we can observe when the tooltip is shown (constructed) and
+// hidden (close() called), without depending on real positioning/rendering.
+jest.mock('../../overlay', () => ({
+  Overlay: jest.fn().mockImplementation(() => ({
+    close: jest.fn()
+  })),
+  OverlayHorizontalDirection: {
+    START_TO_RIGHT: 'start-to-right'
+  },
+  OverlayVerticalDirection: {
+    TO_TOP: 'to-top'
+  }
+}));
+
 describe('ChatItemFormItemsWrapper', () => {
   it('should render form items wrapper', () => {
     const wrapper = new ChatItemFormItemsWrapper({
@@ -120,5 +134,80 @@ describe('ChatItemFormItemsWrapper', () => {
 
     const textInput = wrapper.render.querySelector('input[type="text"]');
     expect(textInput?.hasAttribute('disabled')).toBe(false);
+  });
+
+  describe('form item tooltip lifecycle', () => {
+    const buildSwitchWrapper = (): ChatItemFormItemsWrapper => {
+      const chatItem: ChatItem = {
+        type: ChatItemType.PROMPT,
+        formItems: [
+          {
+            id: 'agentic-toggle',
+            type: 'switch',
+            title: 'Agentic coding',
+            value: 'true',
+            tooltip: 'Turn OFF agentic coding',
+            alternateTooltip: 'Turn ON agentic coding'
+          }
+        ]
+      };
+      return new ChatItemFormItemsWrapper({ tabId: 'test-tab', chatItem });
+    };
+
+    beforeEach(() => {
+      jest.useFakeTimers();
+      const { Overlay } = jest.requireMock('../../overlay');
+      (Overlay as jest.Mock).mockClear();
+      document.body.innerHTML = '';
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+      document.body.innerHTML = '';
+    });
+
+    it('should show the tooltip on hover after the delay', () => {
+      const wrapper = buildSwitchWrapper();
+      document.body.appendChild(wrapper.render);
+      const switchEl = wrapper.render.querySelector('.mynah-form-input-wrapper') as HTMLElement;
+      expect(switchEl).not.toBeNull();
+
+      switchEl.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+      jest.advanceTimersByTime(350);
+
+      const { Overlay } = jest.requireMock('../../overlay');
+      expect(Overlay).toHaveBeenCalledTimes(1);
+    });
+
+    it('should dismiss the tooltip when the control is clicked (so it cannot block the chat after toggling)', () => {
+      const wrapper = buildSwitchWrapper();
+      document.body.appendChild(wrapper.render);
+      const switchEl = wrapper.render.querySelector('.mynah-form-input-wrapper') as HTMLElement;
+
+      switchEl.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+      jest.advanceTimersByTime(350);
+
+      const { Overlay } = jest.requireMock('../../overlay');
+      const overlayInstance = (Overlay as jest.Mock).mock.results[0].value;
+
+      switchEl.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      expect(overlayInstance.close).toHaveBeenCalled();
+    });
+
+    it('should cancel a pending tooltip when the control is clicked before it appears', () => {
+      const wrapper = buildSwitchWrapper();
+      document.body.appendChild(wrapper.render);
+      const switchEl = wrapper.render.querySelector('.mynah-form-input-wrapper') as HTMLElement;
+
+      // Hover starts the show timer, but the user clicks before the delay elapses.
+      switchEl.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+      switchEl.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+      switchEl.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      jest.advanceTimersByTime(350);
+
+      // The overlay must never be created, otherwise it would linger over the chat.
+      const { Overlay } = jest.requireMock('../../overlay');
+      expect(Overlay).not.toHaveBeenCalled();
+    });
   });
 });
