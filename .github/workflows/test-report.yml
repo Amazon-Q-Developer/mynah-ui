@@ -7,7 +7,7 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
       
-    - uses: dorny/test-reporter@v2.0.0
+    - uses: dorny/test-reporter@v2.5.0
       with:
         name: E2E Tests Report
         artifact: test-results
