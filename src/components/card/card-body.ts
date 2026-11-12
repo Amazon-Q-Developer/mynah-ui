@@ -23,13 +23,20 @@ const PREVIEW_DELAY = 500;
 export const highlightersWithTooltip = {
   start: {
     markupStart: '<mark ',
-    markupAttributes: (markerIndex: string) => `marker-index=${markerIndex}`,
+    markupAttributes: (markerIndex: string, markerKey: string) => `marker-index=${markerIndex} marker-key=${markerKey}`,
     markupEnd: ' reference-tracker>'
   },
   end: {
-    markup: '</mark>',
+    // The key on the closing tag is only matched while restoring; the restored tag is a plain '</mark>'.
+    markup: (markerKey: string) => `</mark marker-key=${markerKey}>`,
+    restoredMarkup: '</mark>',
   },
 };
+
+// Code text is restored to markup only where it carries this per-render key,
+// so mark tags written in the message itself stay text.
+const generateMarkerKey = (): string =>
+  Array.from(crypto.getRandomValues(new Uint32Array(4)), part => part.toString(36)).join('');
 
 export const PARTS_CLASS_NAME = 'typewriter-part';
 export const PARTS_CLASS_NAME_VISIBLE = 'typewriter';
@@ -57,6 +64,7 @@ export class CardBody {
   props: CardBodyProps;
   nextCodeBlockIndex: number = 0;
   codeBlockStartIndex: number = 0;
+  private readonly markerKey: string = generateMarkerKey();
   private highlightRangeTooltip: Overlay | null;
   private highlightRangeTooltipTimeout: ReturnType<typeof setTimeout>;
   constructor (props: CardBodyProps) {
@@ -144,6 +152,7 @@ export class CardBody {
 
         const highlighter = new SyntaxHighlighter({
           codeStringWithMarkup: unescapeHTML(codeString),
+          referenceMarkerKey: this.markerKey,
           language: snippetLanguage?.trim() !== '' ? snippetLanguage : '',
           hideLanguage: this.props.hideCodeBlockLanguage,
           wrapCodeBlock: this.props.wrapCode,
@@ -283,17 +292,17 @@ export class CardBody {
       if (props.body !== undefined && props.highlightRangeWithTooltip !== undefined && (props.highlightRangeWithTooltip?.length ?? -1) > 0) {
         props.highlightRangeWithTooltip?.forEach((highlightRangeWithTooltip, index) => {
           if (incomingBody !== undefined && highlightRangeWithTooltip.recommendationContentSpan !== undefined) {
-            const generatedStartMarkup = `${highlightersWithTooltip.start.markupStart}${highlightersWithTooltip.start.markupAttributes(index.toString())}${highlightersWithTooltip.start.markupEnd}`;
-            let calculatedStartIndex = (highlightRangeWithTooltip.recommendationContentSpan.start + (index * (generatedStartMarkup.length + highlightersWithTooltip.end.markup.length)));
+            const generatedStartMarkup = `${highlightersWithTooltip.start.markupStart}${highlightersWithTooltip.start.markupAttributes(index.toString(), this.markerKey)}${highlightersWithTooltip.start.markupEnd}`;
+            const generatedEndMarkup = highlightersWithTooltip.end.markup(this.markerKey);
+            let calculatedStartIndex = (highlightRangeWithTooltip.recommendationContentSpan.start + (index * (generatedStartMarkup.length + generatedEndMarkup.length)));
             let calculatedEndIndex = (calculatedStartIndex + generatedStartMarkup.length - highlightRangeWithTooltip.recommendationContentSpan.start) + highlightRangeWithTooltip.recommendationContentSpan.end;
-            if (calculatedEndIndex > incomingBody.length) {
+            // Compare against the original body, so the inserted markers don't count as overflow.
+            if (highlightRangeWithTooltip.recommendationContentSpan.end > (props.body ?? '').length) {
               calculatedStartIndex = incomingBody.length - 1;
-            }
-            if (calculatedEndIndex > incomingBody.length) {
               calculatedEndIndex = incomingBody.length - 1;
             }
             incomingBody = incomingBody.slice(0, calculatedStartIndex) + generatedStartMarkup + incomingBody.slice(calculatedStartIndex);
-            incomingBody = incomingBody.slice(0, calculatedEndIndex) + highlightersWithTooltip.end.markup + incomingBody.slice(calculatedEndIndex);
+            incomingBody = incomingBody.slice(0, calculatedEndIndex) + generatedEndMarkup + incomingBody.slice(calculatedEndIndex);
           }
         });
       }
