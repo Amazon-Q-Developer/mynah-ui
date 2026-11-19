@@ -22,7 +22,9 @@ import { TextArea } from '../form-items/text-area';
 import { TextInput } from '../form-items/text-input';
 import { Icon, MynahIcons } from '../icon';
 import { Overlay, OverlayHorizontalDirection, OverlayVerticalDirection } from '../overlay';
+import { MoreContentIndicator } from '../more-content-indicator';
 const TOOLTIP_DELAY = 350;
+const FORM_DESCRIPTION_COLLAPSED_HEIGHT_RATIO = 16; // Show less content when collapsed
 export interface ChatItemFormItemsWrapperProps {
   tabId: string;
   chatItem: Partial<ChatItem>;
@@ -75,16 +77,53 @@ export class ChatItemFormItemsWrapper {
             chatItemOption.value = chatItemOption.options?.[0]?.value;
           }
         }
-        let description;
+        let description: ExtendedHTMLElement | undefined;
         if (chatItemOption.description != null) {
-          description = DomBuilder.getInstance().build({
+          const descriptionContent = DomBuilder.getInstance().build({
             type: 'span',
+            classNames: [ 'mynah-ui-form-item-description-content' ],
+            children: [ chatItemOption.description ]
+          });
+
+          description = DomBuilder.getInstance().build({
+            type: 'div',
             testId: testIds.chatItem.chatItemForm.description,
             classNames: [ 'mynah-ui-form-item-description' ],
-            children: [
-              chatItemOption.description,
-            ]
+            children: [ descriptionContent ]
           });
+
+          // Add MoreContentIndicator for long descriptions
+          const moreContentIndicator = new MoreContentIndicator({
+            icon: MynahIcons.DOWN_OPEN,
+            border: false,
+            onClick: () => {
+              if (description?.hasClass('mynah-ui-form-item-description-collapsed') === true) {
+                description.removeClass('mynah-ui-form-item-description-collapsed');
+                moreContentIndicator.update({ icon: MynahIcons.UP_OPEN });
+              } else {
+                description?.addClass('mynah-ui-form-item-description-collapsed');
+                moreContentIndicator.update({ icon: MynahIcons.DOWN_OPEN });
+              }
+            },
+            testId: `${testIds.chatItem.chatItemForm.description}-more-content-indicator`
+          });
+
+          description.insertChild('beforeend', moreContentIndicator.render);
+
+          // Check if content needs collapsing after a short delay
+          setTimeout(() => {
+            const collapsedHeight = window.innerHeight / FORM_DESCRIPTION_COLLAPSED_HEIGHT_RATIO;
+
+            // Show MoreContentIndicator if content exceeds the collapsed max-height
+            if (descriptionContent.scrollHeight > collapsedHeight) {
+              description?.addClass('mynah-ui-form-item-description-auto-collapse');
+              description?.addClass('mynah-ui-form-item-description-collapsed');
+              // Set the collapsed height dynamically
+              description?.style.setProperty('--form-description-collapsed-height', `${collapsedHeight}px`);
+            } else {
+              moreContentIndicator.render.addClass('hidden');
+            }
+          }, 50);
         }
         const fireModifierAndEnterKeyPress = (): void => {
           if ((chatItemOption as TextBasedFormItem).checkModifierEnterKeyPress === true && this.isFormValid()) {
