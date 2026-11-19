@@ -430,6 +430,8 @@ export class MynahUI {
       this.tabsWrapper.setAttribute('selected-tab', MynahUITabsStore.getInstance().getSelectedTabId());
     }
 
+    this.tabContentsWrapper.setAttribute('selected-tab', MynahUITabsStore.getInstance().getSelectedTabId());
+
     this.render = DomBuilder.getInstance().createPortal(
       MynahPortalNames.WRAPPER,
       {
@@ -491,6 +493,9 @@ export class MynahUI {
       if (this.props.onTabRemove !== undefined) {
         this.props.onTabRemove(tabId, this.getUserEventId());
       }
+    });
+    MynahUITabsStore.getInstance().addListener('selectedTabChange', (selectedTabId: string) => {
+      this.tabContentsWrapper.setAttribute('selected-tab', selectedTabId);
     });
 
     this.addGlobalListeners();
