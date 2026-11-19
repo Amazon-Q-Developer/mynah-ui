@@ -502,8 +502,7 @@ export class ChatPromptInput {
           this.clearTextArea(true);
         }
       } else if (e.key === KeyMap.ENTER &&
-        ((!e.isComposing && !e.shiftKey && !e.ctrlKey) ||
-        (e.isComposing && (e.shiftKey)))) {
+        !e.isComposing && !e.shiftKey && !e.ctrlKey) {
         cancelEvent(e);
         this.sendPrompt();
       } else if (
