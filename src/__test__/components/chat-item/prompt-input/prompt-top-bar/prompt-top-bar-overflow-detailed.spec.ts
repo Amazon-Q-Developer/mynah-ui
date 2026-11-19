@@ -232,6 +232,45 @@ describe('PromptTopBar Overflow Detailed Tests', () => {
       expect(mockOnContextItemRemove).toHaveBeenCalled();
     });
 
+    it.each([ "@R&D's <notes>.md", '@a\uE000b.md' ])('should remove an item without id named %s', (command) => {
+      promptTopBar = new PromptTopBar({
+        tabId: 'test-tab',
+        title: 'Test Title',
+        contextItems: [ { command, description: 'Item without ID' } ],
+        onContextItemRemove: mockOnContextItemRemove
+      });
+
+      promptTopBar.visibleCount = 0;
+      const [ overflowItem ] = promptTopBar.getOverflowItemsAsDetailedListGroup()[0].children ?? [];
+      promptTopBar.generateOverflowOverlayChildren();
+
+      const { DetailedListWrapper } = jest.requireMock('../../../../../components/detailed-list/detailed-list');
+      const detailedListProps = DetailedListWrapper.mock.calls[0][0];
+      detailedListProps.onItemClick(overflowItem);
+
+      expect(overflowItem.title).not.toBe(command);
+      expect(mockOnContextItemRemove).toHaveBeenCalledWith(expect.objectContaining({ command }));
+    });
+
+    it('should remove the item without id when another item with an id has the same name', () => {
+      promptTopBar = new PromptTopBar({
+        tabId: 'test-tab',
+        title: 'Test Title',
+        contextItems: [ { command: '@dup.md', id: 'X' }, { command: '@dup.md' } ],
+        onContextItemRemove: mockOnContextItemRemove
+      });
+
+      promptTopBar.visibleCount = 0;
+      const [ , rowWithoutId ] = promptTopBar.getOverflowItemsAsDetailedListGroup()[0].children ?? [];
+      promptTopBar.generateOverflowOverlayChildren();
+
+      const { DetailedListWrapper } = jest.requireMock('../../../../../components/detailed-list/detailed-list');
+      DetailedListWrapper.mock.calls[0][0].onItemClick(rowWithoutId);
+
+      expect(mockOnContextItemRemove).toHaveBeenCalledWith({ command: '@dup.md' });
+      expect(promptTopBar.getOverflowContextItems()).toEqual([ { command: '@dup.md', id: 'X' } ]);
+    });
+
     it('should not remove item when item id and title are null', () => {
       promptTopBar = new PromptTopBar({
         tabId: 'test-tab',
