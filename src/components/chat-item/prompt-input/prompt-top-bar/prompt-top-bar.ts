@@ -1,8 +1,8 @@
 import { DomBuilder, ExtendedHTMLElement } from '../../../../helper/dom';
 import { MynahUIGlobalEvents } from '../../../../helper/events';
-import { convertQuickActionCommandGroupsToDetailedListGroups } from '../../../../helper/quick-pick-data-handler';
+import { convertDetailedListItemToQuickActionCommand, convertQuickActionCommandGroupsToDetailedListGroups, convertQuickActionCommandToDetailedListItem } from '../../../../helper/quick-pick-data-handler';
 import testIds from '../../../../helper/test-ids';
-import { ChatItemButton, DetailedList, DetailedListItemGroup, MynahEventNames, QuickActionCommand } from '../../../../static';
+import { ChatItemButton, DetailedList, DetailedListItem, DetailedListItemGroup, MynahEventNames, QuickActionCommand } from '../../../../static';
 import { Button } from '../../../button';
 import { DetailedListWrapper } from '../../../detailed-list/detailed-list';
 import { Icon, MynahIcons } from '../../../icon';
@@ -322,11 +322,11 @@ export class PromptTopBar {
       this.overflowListContainer = new DetailedListWrapper({
         detailedList: { list: overflowItems, selectable: 'clickable' },
         onItemActionClick: (_, item) => {
-          const itemId = item?.id ?? item?.title;
+          const itemId = this.getOverflowItemId(item);
           if (itemId != null) { this.removeContextPill(itemId); }
         },
         onItemClick: (item) => {
-          const itemId = item.id ?? item.title;
+          const itemId = this.getOverflowItemId(item);
           if (itemId != null) { this.removeContextPill(itemId); }
         },
       });
@@ -342,6 +342,18 @@ export class PromptTopBar {
       classNames: [ 'mynah-chat-prompt-quick-picks-overlay-wrapper' ],
       children: [ this.overflowListContainer.render ]
     }); ;
+  }
+
+  // Overflow rows are built from context items; map a row back to the id used by removeContextPill.
+  private getOverflowItemId (item?: DetailedListItem): string | undefined {
+    if (item == null) return undefined;
+    if (item.id != null) return item.id;
+    if (item.title == null) return undefined;
+    // A row without an id comes from a context item without an id.
+    const contextItem = this.getOverflowContextItems().find(
+      (overflowItem) => overflowItem.id == null && convertQuickActionCommandToDetailedListItem(overflowItem).title === item.title
+    );
+    return contextItem != null ? contextItem.command : convertDetailedListItemToQuickActionCommand(item).command;
   }
 
   getOverflowItemsAsDetailedListGroup (): DetailedListItemGroup[] {
