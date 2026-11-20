@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { DomBuilder, ExtendedHTMLElement } from '../../helper/dom';
+import { DomBuilder, ExtendedHTMLElement, htmlDecode } from '../../helper/dom';
 import { Button } from '../button';
 import { Icon, MynahIcons } from '../icon';
 import { generateUID } from '../../helper/guid';
@@ -144,10 +144,10 @@ export abstract class BaseDropdown<T = any> {
       });
     }
 
-    // Update button label
+    // Update button label. The label is shown as text; character references are resolved like in the initial label.
     const buttonLabel = this.render.querySelector('.mynah-dropdown-list-button .mynah-button-label');
     if (buttonLabel != null) {
-      buttonLabel.innerHTML = this.getDisplayLabel();
+      buttonLabel.textContent = htmlDecode(this.getDisplayLabel());
     }
   };
 
