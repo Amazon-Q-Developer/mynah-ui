@@ -91,7 +91,13 @@ export enum MynahIcons {
 }
 
 export interface CustomIcon {
+  /**
+   * Letters, digits, `_` and `-` only, and not the name of a built-in icon. An icon that is not accepted renders without an image.
+   */
   name: string;
+  /**
+   * An image data URL (`data:image/...`), base64 or percent-encoded, without spaces, quotes or parentheses inside.
+   */
   base64Svg: string;
 }
 
@@ -106,6 +112,8 @@ export interface IconProps {
 export class Icon {
   render: ExtendedHTMLElement;
   props: IconProps;
+  // The name in the element's class, kept so update() removes that class without reading the icon again
+  private iconName: string;
   constructor (props: IconProps) {
     this.props = props;
     StyleLoader.getInstance().load('components/_icon.scss');
@@ -113,6 +121,7 @@ export class Icon {
 
     // Determine if the icon is a custom icon or a predefined one
     const iconName = this.getIconName();
+    this.iconName = iconName;
 
     this.render = DomBuilder.getInstance().build({
       type: 'i',
@@ -126,26 +135,26 @@ export class Icon {
   }
 
   private readonly getIconName = (): string => {
-    // If it's a custom icon, register it first
+    // A custom icon gets the name the importer checked and registered, so a name read again cannot differ from its rule.
+    // An icon the importer does not accept has no style rule, so it gets no name either
     if (this.isCustomIcon(this.props.icon)) {
-      MynahUIIconImporter.getInstance().addCustomIcon(this.props.icon);
+      return MynahUIIconImporter.getInstance().addCustomIcon(this.props.icon) ?? '';
     }
 
-    return this.isCustomIcon(this.props.icon)
-      ? this.props.icon.name
-      : this.props.icon;
+    return this.props.icon;
   };
 
+  // Anything other than a built-in icon name goes to the importer, which rejects values that are not icon objects
   private isCustomIcon (icon: MynahIcons | MynahIconsType | CustomIcon): icon is CustomIcon {
-    return typeof icon === 'object' && 'base64Svg' in icon && 'name' in icon;
+    return typeof icon !== 'string';
   }
 
   public update = (icon: MynahIcons | MynahIconsType | CustomIcon): void => {
-    const oldIconName = this.getIconName();
-    this.render.removeClass(`mynah-ui-icon-${oldIconName}${this.props.subtract === true ? '-subtract' : ''}`);
+    this.render.removeClass(`mynah-ui-icon-${this.iconName}${this.props.subtract === true ? '-subtract' : ''}`);
 
     this.props.icon = icon;
     const newIconName = this.getIconName();
+    this.iconName = newIconName;
     this.render.addClass(`mynah-ui-icon-${newIconName}${this.props.subtract === true ? '-subtract' : ''}`);
   };
 }
