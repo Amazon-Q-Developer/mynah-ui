@@ -1,4 +1,5 @@
 import escapeHTML from 'escape-html';
+import unescapeHTML from 'unescape-html';
 import { DetailedListItem, DetailedListItemGroup, QuickActionCommand, QuickActionCommandGroup } from '../static';
 import { MynahIcons } from '../main';
 
@@ -25,7 +26,7 @@ export const filterQuickPickItems = (commands: QuickActionCommandGroup[], search
         score,
         command: {
           ...cmd,
-          command: highlightMatch(escapeHTML(cmd.command), searchTerm)
+          command: highlightMatch(cmd.command, searchTerm)
         }
       });
     }
@@ -61,8 +62,29 @@ export const filterQuickPickItems = (commands: QuickActionCommandGroup[], search
   return [ returnGroup ];
 };
 
-export const MARK_OPEN = '<mark>';
-export const MARK_CLOSE = '</mark>';
+// Search highlight markers. Private-use characters rather than HTML, so a command name that
+// contains the text <mark> is not treated as a highlight; they become <mark> tags only when the
+// list item title is built.
+export const MARK_OPEN = '\uE000';
+export const MARK_CLOSE = '\uE001';
+
+const HIGHLIGHT_TAGS = /<\/?mark>/g;
+const TITLE_SPECIAL_CHARS = new RegExp(`[&<>"'${MARK_OPEN}${MARK_CLOSE}]`);
+
+/**
+ * Builds the list item title, which is rendered as HTML, from a plain-text command that may
+ * contain search highlight markers.
+ */
+const toQuickPickTitle = (command: string): string =>
+  command == null || !TITLE_SPECIAL_CHARS.test(command)
+    ? command
+    : escapeHTML(command).split(MARK_OPEN).join('<mark>').split(MARK_CLOSE).join('</mark>');
+
+/**
+ * Inverse of toQuickPickTitle: recovers the plain-text command from a list item title, so a
+ * selection carries the original name rather than its HTML form.
+ */
+const fromQuickPickTitle = (title: string): string => unescapeHTML(title.replace(HIGHLIGHT_TAGS, ''));
 
 const highlightMatch = (text: string, searchTerm: string): string => {
   const textToCompare = text.toLowerCase();
@@ -151,7 +173,7 @@ export const convertDetailedListGroupsToQuickActionCommandGroups = (detailedList
 
 export const convertDetailedListItemToQuickActionCommand = (detailedListItem: DetailedListItem): QuickActionCommand => {
   return {
-    command: detailedListItem.title ?? '',
+    command: fromQuickPickTitle(detailedListItem.title ?? ''),
     label: detailedListItem.name,
     ...(detailedListItem.children != null ? { children: convertDetailedListGroupsToQuickActionCommandGroups(detailedListItem.children) } : {}),
     description: detailedListItem.description,
@@ -174,7 +196,7 @@ export const convertQuickActionCommandGroupsToDetailedListGroups = (quickActionC
 
 export const convertQuickActionCommandToDetailedListItem = (quickActionCommand: QuickActionCommand): DetailedListItem => {
   return {
-    title: quickActionCommand.command,
+    title: toQuickPickTitle(quickActionCommand.command),
     name: quickActionCommand.label,
     followupText: quickActionCommand.placeholder,
     ...(quickActionCommand.children != null ? { children: convertQuickActionCommandGroupsToDetailedListGroups(quickActionCommand.children) } : {}),

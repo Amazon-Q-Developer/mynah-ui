@@ -4,26 +4,33 @@ on:
   push:
     tags: ['v*.*', 'beta*.*']
 
-permissions:
-  id-token: write # Required for OIDC authentication with npm
-  packages: write
-  checks: write
-  contents: write
-  actions: read
+# No token permissions by default; each job below is granted only what it uses.
+permissions: {}
 
 jobs:
   lint:
+    permissions:
+      contents: read
     uses: ./.github/workflows/lint.yml
   unit-tests:
+    permissions:
+      contents: read
     uses: ./.github/workflows/unit-tests.yml
   e2e-linux:
+    # Must cover what the e2e-linux job in the called workflow requests
+    permissions:
+      contents: read
+      packages: write
     uses: ./.github/workflows/e2e-linux.yml
   build-beta:
     if: ${{ startsWith(github.ref_name, 'beta') }}
     runs-on: macos-latest
+    permissions:
+      contents: read
+      id-token: write # Required for OIDC authentication with npm
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '24.x'
           registry-url: 'https://registry.npmjs.org'
@@ -38,9 +45,12 @@ jobs:
     if: ${{ startsWith(github.ref_name, 'v') }}
     needs: [lint, unit-tests, e2e-linux]
     runs-on: macos-latest
+    permissions:
+      contents: write # Read the release and upload the demo app as a release asset
+      id-token: write # Required for OIDC authentication with npm
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '24.x'
           registry-url: 'https://registry.npmjs.org'
@@ -51,24 +61,37 @@ jobs:
         run: npm run packdemo
       - name: Get release info
         id: get_release
-        uses: bruceadams/get-release@v1.3.2
         env:
-          GITHUB_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF#refs/tags/}"
+          release="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${tag}")"
+          {
+            echo "tag_name=${tag}"
+            echo "html_url=$(jq -r .html_url <<< "$release")"
+            echo "upload_url=$(jq -r .upload_url <<< "$release")"
+          } >> "$GITHUB_OUTPUT"
       - name: Upload demo app to assets
-        uses: actions/upload-release-asset@v1
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.get_release.outputs.upload_url }}
-          asset_path: ./example/mynah-ui-demo.zip
-          asset_name: mynah-ui-demo.zip
-          asset_content_type: application/zip
+          GH_TOKEN: ${{ github.token }}
+          UPLOAD_URL: ${{ steps.get_release.outputs.upload_url }}
+        run: |
+          set -euo pipefail
+          curl --fail-with-body --silent --show-error --location -X POST \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Content-Type: application/zip" \
+            --data-binary @./example/mynah-ui-demo.zip \
+            "${UPLOAD_URL%%\{*}?name=mynah-ui-demo.zip"
       - name: Publish to npm
         run: npm publish --access public
       - name: Update Channels
-        uses: fjogeleit/http-request-action@v1
-        with:
-          url: '${{ secrets.SLACK_ENDPOINT }}'
-          method: 'POST'
-          customHeaders: '{"Content-Type": "application/json"}'
-          data: '{"version": "${{ steps.get_release.outputs.tag_name }}", "url": "${{ steps.get_release.outputs.html_url }}"}'
+        env:
+          SLACK_ENDPOINT: ${{ secrets.SLACK_ENDPOINT }}
+          VERSION: ${{ steps.get_release.outputs.tag_name }}
+          RELEASE_URL: ${{ steps.get_release.outputs.html_url }}
+        run: |
+          set -euo pipefail
+          jq -nc --arg version "$VERSION" --arg url "$RELEASE_URL" '{version: $version, url: $url}' |
+            curl --fail-with-body --silent --show-error --location --max-time 5 \
+              -H "Content-Type: application/json" --data @- "$SLACK_ENDPOINT"

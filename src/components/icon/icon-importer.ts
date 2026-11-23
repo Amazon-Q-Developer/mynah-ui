@@ -86,9 +86,76 @@ import IMAGE from './icons/image.svg';
 import DESKTOP from './icons/desktop.svg';
 import GLOBE from './icons/globe.svg';
 
+// Custom icon values are written into a stylesheet as-is, so a name must be a plain
+// identifier and the image must be an image data URL made only of URL characters.
+const CUSTOM_ICON_NAME = /^[A-Za-z0-9_-]+$/;
+const CUSTOM_ICON_IMAGE = /^data:image\/[\w\-.~:/?#[\]@!$&+,;=%]+$/i;
+const SUBTRACT_SUFFIX = '-subtract';
+
+let builtInIconNames: Set<string> | undefined;
+// A custom icon shares its rule names with the built-in icons, so it cannot use one of theirs.
+// Compared in lower case, as class selectors match case-insensitively in quirks mode.
+const isBuiltInIconName = (name: string): boolean => {
+  if (builtInIconNames === undefined) {
+    builtInIconNames = new Set([ ...Object.keys(MynahIcons), ...Object.values(MynahIcons) ].map(builtIn => builtIn.toLowerCase()));
+  }
+  const lowerName = name.toLowerCase();
+  const withoutSuffix = lowerName.endsWith(SUBTRACT_SUFFIX) ? lowerName.slice(0, -SUBTRACT_SUFFIX.length) : lowerName;
+  return builtInIconNames.has(lowerName) || builtInIconNames.has(withoutSuffix);
+};
+
+const CSS_SPACES = ' \t\n\r\f';
+const trimSpaces = (value: string): string => {
+  let start = 0;
+  let end = value.length;
+  while (start < end && CSS_SPACES.includes(value[start])) start++;
+  while (end > start && CSS_SPACES.includes(value[end - 1])) end--;
+  return value.slice(start, end);
+};
+
+type CheckedIcon = { accepted: true; name: string; image: string } | { accepted: false; label: string };
+
+// Shown in the rejection warning: the shortened name, or the type of the name or of the value given
+const getRejectedLabel = (value: unknown, name: unknown): string => {
+  if (value === null || typeof value !== 'object') {
+    return value === null ? 'null' : typeof value;
+  }
+  return typeof name === 'string' ? JSON.stringify(name.slice(0, 40)) : typeof name;
+};
+
+// Returns the name and image as they are written into the stylesheet, or a label for the warning if the icon is not accepted.
+// Each value is read once, so the value that is checked is the value that is written.
+const checkIcon = (customIcon: unknown): CheckedIcon => {
+  let name: unknown;
+  let base64Svg: unknown;
+  try {
+    if (customIcon !== null && typeof customIcon === 'object') {
+      ({ name, base64Svg } = customIcon as Partial<CustomIcon>);
+    }
+  } catch {
+    // A getter or Proxy that throws is treated like a missing value
+  }
+  const rejected = { accepted: false as const, label: getRejectedLabel(customIcon, name) };
+  if (typeof name !== 'string' || typeof base64Svg !== 'string' || !CUSTOM_ICON_NAME.test(name) || isBuiltInIconName(name)) {
+    return rejected;
+  }
+  // Surrounding whitespace and one pair of quotes mean the same inside url(), so they are dropped
+  let image = trimSpaces(base64Svg);
+  if (image.length > 1 && (image[0] === '"' || image[0] === "'") && image[image.length - 1] === image[0]) {
+    image = trimSpaces(image.slice(1, -1));
+  }
+  return CUSTOM_ICON_IMAGE.test(image) ? { accepted: true, name, image } : rejected;
+};
+
+// Hosts often rebuild icon objects on every render, so warnings are grouped by label, and the oldest label
+// is forgotten past this many so the set stays small.
+const MAX_REPORTED_LABELS = 100;
+
 export class MynahUIIconImporter {
   private static instance: MynahUIIconImporter;
   private readonly customIcons: Map<string, string> = new Map();
+  // Labels of rejected icons already reported, in the order they were first reported
+  private readonly reportedLabels: Set<string> = new Set();
   private readonly portalId = 'mynah-ui-icons';
   private readonly defaultIconMappings = {
     Q,
@@ -186,13 +253,29 @@ export class MynahUIIconImporter {
     this.createIconStyles(this.defaultIconMappings);
   }
 
-  public addCustomIcon (customIcon: CustomIcon): void {
-    // If icon already exists with same content, no need to proceed
-    if (this.customIcons.get(customIcon.name) === customIcon.base64Svg) {
-      return;
+  /**
+   * Registers a custom icon and returns the name it was registered under, or undefined if its name or image is not accepted.
+   */
+  public addCustomIcon (customIcon: CustomIcon): string | undefined {
+    const checked = checkIcon(customIcon);
+    if (!checked.accepted) {
+      if (!this.reportedLabels.has(checked.label)) {
+        if (this.reportedLabels.size >= MAX_REPORTED_LABELS) {
+          this.reportedLabels.delete(this.reportedLabels.values().next().value as string);
+        }
+        this.reportedLabels.add(checked.label);
+        console.warn(`Custom icon ${checked.label} was not registered: its name or image is not in the accepted format`);
+      }
+      return undefined;
     }
 
-    this.customIcons.set(customIcon.name, customIcon.base64Svg);
+    const { name, image } = checked;
+    // If icon already exists with same content, no need to proceed
+    if (this.customIcons.get(name) === image) {
+      return name;
+    }
+
+    this.customIcons.set(name, image);
 
     // Recreate all styles including both default and custom icons
     this.cleanupExistingPortal();
@@ -200,6 +283,7 @@ export class MynahUIIconImporter {
       ...this.defaultIconMappings,
       ...Object.fromEntries(this.customIcons)
     });
+    return name;
   }
 
   private createIconStyles (iconMappings: Record<string, string>): void {
@@ -210,8 +294,8 @@ export class MynahUIIconImporter {
       },
       children: [ `
         ${Object.keys(iconMappings).map(iconKey => {
-          // eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
-          const iconName = MynahIcons[iconKey as keyof typeof MynahIcons] || iconKey;
+          // Own keys only, so a custom name such as 'constructor' is not resolved to an inherited member
+          const iconName = Object.prototype.hasOwnProperty.call(MynahIcons, iconKey) ? MynahIcons[iconKey as keyof typeof MynahIcons] : iconKey;
           return `
           :root{
             --mynah-ui-icon-${iconName}: url(${iconMappings[iconKey]});
